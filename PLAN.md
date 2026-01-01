@@ -123,3 +123,9 @@ _В этой работе измеряется локальная внутрен
    arXiv preprint, arXiv:2504.02873, version 1. 2025
 
 _Расширение идеи топологического анализа эмбеддингов: Persistent Homology Dimension (PHD) используется для детекции очень коротких текстов, с добавлением "вставки не по теме" (off-topic insertion) для стабильности оценки._
+
+6. Randall Balestriero, Romain Cosentino, Sarath Shekkizhar.
+   "Characterizing Large Language Model Geometry Helps Solve Toxicity Detection and Generation".
+   arXiv preprint, arXiv:2312.01648, version 3. 2024
+
+_Аналитическое понимание внутренней структуры больших языковых моделей (LLM) с помощью геометрии, а также, как геометрические свойства можно использовать для практических задач._
