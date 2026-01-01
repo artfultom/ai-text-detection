@@ -106,7 +106,7 @@ _Обзорная статья с общими методами решения �
 
 _Авторы предлагают использовать внутреннюю размерность (intrinsic dimension) множества эмбеддингов текста как признак для детекции сгенерированного текста._
 
-3. Junchao Wu, Shu Yang, Runzhe Zhan et al.
+3. Eduard Tulchinskii, Kristian Kuznetsov, Laida Kushnareva et al.
    "Robust AI-Generated Text Detection by Restricted Embeddings".
    arXiv preprint, arXiv:2410.08113, version 1. 2024
 
