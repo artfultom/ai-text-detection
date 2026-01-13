@@ -100,43 +100,49 @@ _Авторы предлагают два набора данных - полно
 
 _Обзорная статья с общими методами решения проблемы._
 
-2. Feng Xiao, Jicong Fan.
+2. Yang Cao, Sikun Yang, Chen Li et al.
+   "TAD-Bench: A Comprehensive Benchmark for Embedding-Based Text Anomaly Detection".
+   arXiv preprint, arXiv:2501.11960, version 2. 2025
+
+_Статья представляет масштабный бенчмарк для выявления аномалий в текстах._
+
+3. Feng Xiao, Jicong Fan.
    "Text-ADBench: Text Anomaly Detection Benchmark based on LLMs Embedding".
    arXiv preprint, arXiv:2507.12295, version 1. 2025
 
 _Статья представляет комплексный бенчмарк, показывающий, что качественные LLM-эмбеддинги существенно улучшают обнаружение текстовых аномалий, при этом простые методы с хорошими эмбеддингами часто не уступают сложным моделям._
 
-3. Yuangang Li, Jiaqi Li, Zhuo Xiao et al.
+4. Yuangang Li, Jiaqi Li, Zhuo Xiao et al.
    "NLP-ADBench: NLP Anomaly Detection Benchmark".
    arXiv preprint, arXiv:2412.04784, version 2. 2025
 
 _Статья представляет систематический бенчмарк для обнаружения аномалий в текстах, показывая, что методы на основе эмбеддингов предобученных языковых моделей (особенно с простыми статистическими критериями вроде Mahalanobis distance) стабильно превосходят классические и нейросетевые подходы в различных типах NLP-аномалий._
 
-4. Eduard Tulchinskii, Kristian Kuznetsov, Laida Kushnareva et al.
+5. Eduard Tulchinskii, Kristian Kuznetsov, Laida Kushnareva et al.
    "Intrinsic Dimension Estimation for Robust Detection of AI-Generated Texts".
    arXiv preprint, arXiv:2306.04723, version 2. 2023
 
 _Авторы предлагают использовать внутреннюю размерность (intrinsic dimension) множества эмбеддингов текста как признак для детекции сгенерированного текста._
 
-5. Eduard Tulchinskii, Kristian Kuznetsov, Laida Kushnareva et al.
+6. Eduard Tulchinskii, Kristian Kuznetsov, Laida Kushnareva et al.
    "Robust AI-Generated Text Detection by Restricted Embeddings".
    arXiv preprint, arXiv:2410.08113, version 1. 2024
 
 _Авторы показывают, что удаление ("очистка") линейных подпространств (linear subspaces) в эмбеддинговом пространстве улучшает устойчивость (robustness) классификатора при детекции текста от разных LLM и в разных доменах._
 
-6. F. Yin, J. Srinivasa, K. W. Chang.
+7. F. Yin, J. Srinivasa, K. W. Chang.
    "Characterizing Truthfulness in Large Language Model Generations with Local Intrinsic Dimension".
    arXiv preprint, ArXiv:2402.18048, version 1. 2024
 
 _В этой работе измеряется локальная внутренняя размерность (Local Intrinsic Dimension, LID) активаций модели для оценки "правдивости" (truthfulness) генерируемого текста._
 
-7. Canaan Yung, Hanxun Huang, Christopher Leckie, Sarah Erfani.
+8. Canaan Yung, Hanxun Huang, Christopher Leckie, Sarah Erfani.
    "Short-PHD: Detecting Short LLM-Generated Text with Topological Data Analysis After Off-topic Content Insertion".
    arXiv preprint, arXiv:2504.02873, version 1. 2025
 
 _Расширение идеи топологического анализа эмбеддингов: Persistent Homology Dimension (PHD) используется для детекции очень коротких текстов, с добавлением "вставки не по теме" (off-topic insertion) для стабильности оценки._
 
-8. Randall Balestriero, Romain Cosentino, Sarath Shekkizhar.
+9. Randall Balestriero, Romain Cosentino, Sarath Shekkizhar.
    "Characterizing Large Language Model Geometry Helps Solve Toxicity Detection and Generation".
    arXiv preprint, arXiv:2312.01648, version 3. 2024
 
