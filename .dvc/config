@@ -1,0 +1,6 @@
+[core]
+    remote = yc
+    autostage = true
+['remote "yc"']
+    url = s3://ai-text-detection
+    endpointurl = https://storage.yandexcloud.net
