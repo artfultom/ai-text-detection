@@ -1,0 +1,9 @@
+name: "mistral-7b-instruct-v0.2.Q5_K_M"
+path: "models/mistral-7b-instruct-v0.2.Q5_K_M.gguf"
+n_ctx: 32768
+n_gpu_layers: -1
+n_batch: 1024
+n_threads: 12
+prompt_start: "[INST]"
+prompt_end: "[/INST]"
+out_file_prefix: "mistral_essays"

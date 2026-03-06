@@ -1,0 +1,95 @@
+strategy_1:
+  prompt: |
+    Write an essay of about {} words on the topic '{}'.
+    Start directly with the first sentence of the essay. Absolutely no title or heading of any kind.
+    Output only the essay text.
+strategy_2:
+  prompt: |
+    Write an essay of about {} words on the topic '{}', following the stylistic and structural conventions of IvyPanda essays.
+
+    STYLE REQUIREMENTS (IvyPanda-like):
+    1. The tone must be academic, clear, neutral, and objective.
+    2. The essay should include background context, a clear analytical structure, and well-developed paragraphs.
+    3. Arguments must be supported with reasoning, concise explanations, and relevant examples.
+    4. The writing must be coherent, logically progressive, and easy to read.
+    5. Avoid emotional language or overly dramatic phrasing.
+
+    STRUCTURE REQUIREMENTS:
+    1. Divide the essay into several sections, each starting with a plain-text subheading.
+    2. Subheadings must contain only letters and spaces — no punctuation, no symbols, and absolutely no Markdown formatting.
+       - This means: no asterisks, no bold, no italics, no underscores, no brackets.
+       - Subheadings must appear as plain text lines, e.g. Background Context
+    3. Each subheading must be on its own line with exactly one blank line before and after it.
+    4. No overall essay title — begin directly with the first subheading.
+    5. Output must be plain text only (no Markdown, no asterisks, no bold, no italics, no hashtags, no special formatting).
+
+    OPTIONAL ELEMENTS:
+    You may include a plain-text references section at the end if appropriate to the topic, but this is optional.
+
+    Begin with the first subheading, then continue with the first paragraph.
+    Output only the essay text.
+strategy_3:
+  prompt: |
+    You are a helpful writing assistant. Your task is to generate essays of a given length and topic.
+    Start directly with the first sentence. No titles or headings. Output only the essay text.
+
+    Here is an example:
+
+    Example topic: "{}"
+    Example length: {} words
+
+    Example output:
+    {}
+
+    Now generate a new essay.
+
+    Topic: "{}"
+    Length: {} words
+
+    Write the essay now.
+strategy_4:
+  prompt_1: |
+    Identify the writing style and format of the text, excluding all semantic content and themes.
+
+    Text:
+    {}
+  prompt_2: |
+    Write an essay of about {} words on the topic '{}'.
+
+    You are given the following style-and-format description:
+    '{}'
+
+    Start directly with the first sentence of the essay. Absolutely no title or heading of any kind.
+    Output only the essay text.
+strategy_5:
+  prompt_1: |
+    You are an academic writing instructor.
+    Create a well-structured outline for an academic essay on the following topic: {}.
+
+    Requirements:
+
+    The outline must include the following sections:
+    - Introduction
+    - Main Body (2–4 thematic sections)
+    - Counterarguments / Alternative Perspectives
+    - Conclusion
+
+    Each section should contain 2–3 concise bullet points describing the key ideas or arguments.
+    The outline should reflect a clear thesis-driven structure.
+    Use formal academic language.
+
+    Do not write the essay itself.
+  prompt_2: |
+    You are an academic essay writer.
+    Write a coherent academic essay of about {} words on the topic '{}' strictly following the outline below.
+
+    Outline:
+    {}
+
+    Requirements:
+    - Follow the outline in the given order without adding or removing sections.
+    - Develop each bullet point into a full, well-argued paragraph.
+    - Maintain a formal academic tone and clear argumentative logic.
+    - Use appropriate academic transitions and signposting.
+    - Do not introduce new arguments or themes not present in the outline.
+    - Avoid informal language, personal anecdotes, and unsupported claims.

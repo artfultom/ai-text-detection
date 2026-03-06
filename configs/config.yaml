@@ -1,0 +1,11 @@
+defaults:
+  - model: mistral
+  - generation: default
+  - prompts: prompts
+  - dataset: default
+  - _self_
+
+run:
+  start: 0
+  count: 1
+  seed: 42

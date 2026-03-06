@@ -1,0 +1,14 @@
+input_path: "data/combined_essays.jsonl"
+human_path: "datasets1/ivy_panda_essays.csv"
+output_dir: "datasets1" # TODO
+
+sources:
+  ivy_panda:
+    source_name: "IvyPanda Essays"
+    output_file: "ivy_panda_essays.csv"
+  asap2:
+    source_name: "ASAP2"
+    output_file: "asap2_essays.csv"
+  persuade:
+    source_name: "PERSUADE"
+    output_file: "persuade_essays.csv"

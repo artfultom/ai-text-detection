@@ -1,12 +1,50 @@
-import fire
+import subprocess
+import sys
 
-from ai_text_detector.data.human_datasets import download_datasets
-from ai_text_detector.data.ai_datasets import generate_datasets
+COMMANDS: dict[str, tuple[str, str]] = {
+    "generate_ai": (
+        "ai_text_detector/data/ai_datasets.py",
+        "Generate AI essays with local LLMs (Mistral / LLaMA) using 5 prompt strategies",
+    ),
+    "download_datasets": (
+        "ai_text_detector/data/human_datasets.py",
+        "Parse combined_essays.jsonl and split into IvyPanda / ASAP2 / PERSUADE CSVs",
+    ),
+}
+
+
+def print_help() -> None:
+    print(__doc__)
+    print("Available commands:\n")
+    max_len = max(len(k) for k in COMMANDS)
+    for name, (script, desc) in COMMANDS.items():
+        print(f"  {name:<{max_len}}  →  {desc}")
+    print()
+
+
+def run_command(name: str, extra_args: list[str]) -> int:
+    if name not in COMMANDS:
+        print(f"Unknown command: '{name}'")
+        print(f"Available: {', '.join(COMMANDS)}")
+        return 1
+
+    script, _ = COMMANDS[name]
+    cmd = [sys.executable, script, *extra_args]
+    print(f"Running: {' '.join(cmd)}\n")
+    result = subprocess.run(cmd)
+    return result.returncode
+
+
+def main() -> None:
+    args = sys.argv[1:]
+
+    if not args or args[0] in ("-h", "--help", "help"):
+        print_help()
+        sys.exit(0)
+
+    command, *extra = args
+    sys.exit(run_command(command, extra))
+
 
 if __name__ == "__main__":
-    fire.Fire(
-        {
-            "download_datasets": download_datasets,
-            "generate_ai": generate_datasets,
-        }
-    )
+    main()

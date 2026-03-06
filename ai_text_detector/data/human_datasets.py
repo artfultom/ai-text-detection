@@ -1,87 +1,96 @@
-import pandas as pd
 import json
+import os
 from collections import defaultdict
 
-
-def download_datasets():
-    essays = load_combined_essays("data/combined_essays.jsonl")
-
-    ivy_panda_essays = [essay for essay in essays if essay['source'] == 'IvyPanda Essays']
-    print(f"Загружено {len(ivy_panda_essays)} эссе с IvyPanda Essays")
-    save_ivy_panda_essays(ivy_panda_essays, "datasets1/ivy_panda_essays.csv")
-
-    asap2_essays = [essay for essay in essays if essay['source'] == 'ASAP2']
-    print(f"Загружено {len(asap2_essays)} эссе с ASAP2")
-    save_asap2_essays(asap2_essays, "datasets1/asap2_essays.csv")
-
-    persuade_essays = [essay for essay in essays if essay['source'] == 'PERSUADE']
-    print(f"Загружено {len(persuade_essays)} эссе с PERSUADE")
-    save_persuade_essays(persuade_essays, "datasets1/persuade_essays.csv")
+import hydra
+import pandas as pd
+from omegaconf import DictConfig
 
 
-def load_combined_essays(filename):
+def load_combined_essays(path: str) -> list[dict]:
     essays = []
-    with open(filename, 'r', encoding='utf-8') as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             essays.append(json.loads(line))
-
-    print(f"Загружено {len(essays)} эссе")
-
+    print(f"Loaded {len(essays)} essays to {path}")
     return essays
 
 
-def save_ivy_panda_essays(essays, filename):
-    ivy_panda_rows = []
+def save_ivy_panda_essays(essays: list[dict], path: str) -> None:
+    rows = []
     for essay in essays:
-        text = essay['text']
-        title, _, body = text.partition('\n\n')
+        title, _, body = essay["text"].partition("\n\n")
+        rows.append({"title": title, "text": body})
 
-        ivy_panda_rows.append({"title": title, "text": body})
-
-    ivy_panda_df = pd.DataFrame(ivy_panda_rows)
-    ivy_panda_df.to_csv(filename, index=False, encoding="utf-8")
+    pd.DataFrame(rows).to_csv(path, index=False, encoding="utf-8")
+    print(f"  Saved {len(rows)} rows → {path}")
 
 
-def save_asap2_essays(essays, filename):
-    asap2_rows = []
+def save_asap2_essays(essays: list[dict], path: str) -> None:
+    rows = []
     for essay in essays:
-        text = essay['text']
-        if not text:
+        text = essay.get("text")
+        extra = essay.get("extra_data")
+        if not text or not extra:
             continue
-
-        extra_data = essay['extra_data']
-        if not extra_data:
-            continue
-
-        title = extra_data['prompt_name']
+        title = extra.get("prompt_name")
         if not title:
             continue
+        rows.append({"title": title, "text": text})
 
-        asap2_rows.append({"title": title, "text": text})
-
-    asap2_df = pd.DataFrame(asap2_rows)
-    asap2_df.to_csv(filename, index=False, encoding="utf-8")
+    pd.DataFrame(rows).to_csv(path, index=False, encoding="utf-8")
+    print(f"  Saved {len(rows)} rows → {path}")
 
 
-def save_persuade_essays(essays, filename):
-    essays_by_id = defaultdict(list)
+def save_persuade_essays(essays: list[dict], path: str) -> None:
+    essays_by_id: dict[str, list] = defaultdict(list)
     for e in essays:
-        essay_id = e['extra_data']['essay_id_comp']
+        essay_id = e["extra_data"]["essay_id_comp"]
         essays_by_id[essay_id].append(e)
 
-    data = []
-    for essay_id, parts in essays_by_id.items():
-        parts_sorted = sorted(parts, key=lambda x: x['extra_data']['discourse_start'])
-        full_text = "\n\n".join(p['text'].strip() for p in parts_sorted)
-
-        title = parts_sorted[0]['extra_data'].get('prompt_name')
+    rows = []
+    for parts in essays_by_id.values():
+        parts_sorted = sorted(parts, key=lambda x: x["extra_data"]["discourse_start"])
+        title = parts_sorted[0]["extra_data"].get("prompt_name")
         if title is None:
             continue
+        full_text = "\n\n".join(p["text"].strip() for p in parts_sorted)
+        rows.append({"title": title, "text": full_text})
 
-        data.append({
-            "title": title,
-            "text": full_text
-        })
+    pd.DataFrame(rows).to_csv(path, index=False, encoding="utf-8")
+    print(f"  Saved {len(rows)} rows → {path}")
 
-    persuade_df = pd.DataFrame(data)
-    persuade_df.to_csv(filename, index=False)
+
+SAVERS = {
+    "ivy_panda": save_ivy_panda_essays,
+    "asap2": save_asap2_essays,
+    "persuade": save_persuade_essays,
+}
+
+
+@hydra.main(config_path="../../configs", config_name="config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    dataset_cfg = cfg.dataset
+    os.makedirs(dataset_cfg.output_dir, exist_ok=True)
+
+    essays = load_combined_essays(dataset_cfg.input_path)
+
+    for key, source_cfg in dataset_cfg.sources.items():
+        source_name = source_cfg.source_name
+        output_path = os.path.join(dataset_cfg.output_dir, source_cfg.output_file)
+
+        subset = [e for e in essays if e["source"] == source_name]
+        print(f"Loaded {len(subset)} essays of {source_name}")
+
+        saver = SAVERS.get(key)
+        if saver is None:
+            print(f"  [!] No saver '{key}', skipping")
+            continue
+
+        saver(subset, output_path)
+
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()
