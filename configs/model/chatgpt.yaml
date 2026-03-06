@@ -1,0 +1,5 @@
+name: "gpt-4.1"
+provider: "openai"
+api_key_env: "OPENAI_API_KEY"
+out_file_prefix: "chatgpt_essays"
+pause_seconds: 1.0

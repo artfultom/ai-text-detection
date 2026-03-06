@@ -1,0 +1,7 @@
+name: "deepseek-chat"
+provider: "deepseek"
+base_url: "https://api.deepseek.com"
+api_key_env: "DEEPSEEK_API_KEY"
+out_file_prefix: "deepseek_essays"
+system_prompt: "You are an expert academic essay writer. You produce well-structured, logical, and substantive essays with clear argumentation, proper citations, and academic rigor."
+pause_seconds: 1.0

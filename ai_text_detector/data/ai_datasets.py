@@ -4,35 +4,13 @@ import re
 
 import hydra
 import pandas as pd
-from llama_cpp import Llama
 from omegaconf import DictConfig
 
-
-def load_model(cfg: DictConfig) -> Llama:
-    return Llama(
-        model_path=cfg.model.path,
-        n_ctx=cfg.model.n_ctx,
-        n_gpu_layers=cfg.model.n_gpu_layers,
-        n_batch=cfg.model.n_batch,
-        n_threads=cfg.model.n_threads,
-        use_mlock=True,
-        use_mmap=True,
-        metal=True,
-        verbose=False,
-        seed=cfg.run.seed,
-    )
+from api_client import BaseClient, build_client
 
 
-def generate_response(llm: Llama, prompt: str, cfg: DictConfig) -> str:
-    output = llm(
-        prompt,
-        max_tokens=llm.n_ctx() // 2,
-        temperature=cfg.generation.temperature,
-        top_p=cfg.generation.top_p,
-        top_k=cfg.generation.top_k,
-        repeat_penalty=cfg.generation.repeat_penalty,
-    )
-    return output["choices"][0]["text"]
+def generate_response(client: BaseClient, prompt: str, cfg: DictConfig) -> str:
+    return client.generate(prompt, cfg)
 
 
 def word_count(text: str) -> int:
@@ -41,7 +19,10 @@ def word_count(text: str) -> int:
 
 
 def wrap_prompt(raw: str, cfg: DictConfig) -> str:
-    return f"{cfg.model.prompt_start}\n{raw}{cfg.model.prompt_end}"
+    """Wraps prompt with model-specific tokens for local models; passthrough for API models."""
+    if cfg.model.provider == "local":
+        return f"{cfg.model.prompt_start}\n{raw}\n{cfg.model.prompt_end}"
+    return raw
 
 
 def save_dataset(cfg: DictConfig, index: int, df: pd.DataFrame) -> None:
@@ -57,7 +38,7 @@ def save_dataset(cfg: DictConfig, index: int, df: pd.DataFrame) -> None:
     print(f"  Saved {len(df)} rows → {file_path}")
 
 
-def generate(llm, model_name, df, prompt_raw, cfg):
+def generate(client, model_name, df, prompt_raw, cfg):
     start, n = cfg.run.start, cfg.run.count
     rows = []
     for i in range(start, start + n):
@@ -65,7 +46,7 @@ def generate(llm, model_name, df, prompt_raw, cfg):
         length = word_count(df.loc[i, "text"])
         prompt = prompt_raw.format(length, title)
         try:
-            response = generate_response(llm, prompt, cfg).lstrip()
+            response = generate_response(client, prompt, cfg).lstrip()
         except Exception as e:
             print(f"  [strategy 1] row {i} failed: {e}")
             continue
@@ -73,7 +54,7 @@ def generate(llm, model_name, df, prompt_raw, cfg):
     return pd.DataFrame(rows)
 
 
-def generate_few_shot(llm, model_name, df, prompt_raw, cfg):
+def generate_few_shot(client, model_name, df, prompt_raw, cfg):
     start, n = cfg.run.start, cfg.run.count
     rows = []
     for i in range(start + 1, start + n + 1):
@@ -84,7 +65,7 @@ def generate_few_shot(llm, model_name, df, prompt_raw, cfg):
         length = word_count(df.loc[i, "text"])
         prompt = prompt_raw.format(prev_title, prev_length, prev_text, title, length)
         try:
-            response = generate_response(llm, prompt, cfg).lstrip()
+            response = generate_response(client, prompt, cfg).lstrip()
         except Exception as e:
             print(f"  [strategy 3] row {i} failed: {e}")
             continue
@@ -92,7 +73,7 @@ def generate_few_shot(llm, model_name, df, prompt_raw, cfg):
     return pd.DataFrame(rows)
 
 
-def generate_with_content(llm, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
+def generate_with_content(client, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
     start, n = cfg.run.start, cfg.run.count
     rows = []
     for i in range(start, start + n):
@@ -101,9 +82,9 @@ def generate_with_content(llm, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
         text = df.loc[i, "text"]
         prompt_1 = prompt_raw_1.format(text)
         try:
-            response_1 = generate_response(llm, prompt_1, cfg).lstrip()
+            response_1 = generate_response(client, prompt_1, cfg).lstrip()
             prompt_2 = prompt_raw_2.format(length, title, response_1)
-            response_2 = generate_response(llm, prompt_2, cfg).lstrip()
+            response_2 = generate_response(client, prompt_2, cfg).lstrip()
         except Exception as e:
             print(f"  [strategy 4] row {i} failed: {e}")
             continue
@@ -118,7 +99,7 @@ def generate_with_content(llm, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
     return pd.DataFrame(rows)
 
 
-def generate_with_plan(llm, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
+def generate_with_plan(client, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
     start, n = cfg.run.start, cfg.run.count
     rows = []
     for i in range(start, start + n):
@@ -126,9 +107,9 @@ def generate_with_plan(llm, model_name, df, prompt_raw_1, prompt_raw_2, cfg):
         length = word_count(df.loc[i, "text"])
         prompt_1 = prompt_raw_1.format(title)
         try:
-            response_1 = generate_response(llm, prompt_1, cfg).lstrip()
+            response_1 = generate_response(client, prompt_1, cfg).lstrip()
             prompt_2 = prompt_raw_2.format(length, title, response_1)
-            response_2 = generate_response(llm, prompt_2, cfg).lstrip()
+            response_2 = generate_response(client, prompt_2, cfg).lstrip()
         except Exception as e:
             print(f"  [strategy 5] row {i} failed: {e}")
             continue
@@ -148,8 +129,8 @@ def main(cfg: DictConfig) -> None:
     print(f"Loading dataset from {cfg.dataset.human_path} ...")
     df = pd.read_csv(cfg.dataset.human_path, encoding="utf-8")
 
-    print(f"Loading model {cfg.model.name} ...")
-    llm = load_model(cfg)
+    print(f"Initialising client for model '{cfg.model.name}' (provider: {cfg.model.provider}) ...")
+    client = build_client(cfg)
     model_name = cfg.model.name
     strategies = list(cfg.generation.strategies)
 
@@ -159,23 +140,23 @@ def main(cfg: DictConfig) -> None:
 
     if 1 in strategies:
         print("Strategy 1: zero-shot basic")
-        df1 = generate(llm, model_name, df, wrap_prompt(p.strategy_1.prompt, cfg), cfg)
+        df1 = generate(client, model_name, df, wrap_prompt(p.strategy_1.prompt, cfg), cfg)
         save_dataset(cfg, 1, df1)
 
     if 2 in strategies:
         print("Strategy 2: IvyPanda style")
-        df2 = generate(llm, model_name, df, wrap_prompt(p.strategy_2.prompt, cfg), cfg)
+        df2 = generate(client, model_name, df, wrap_prompt(p.strategy_2.prompt, cfg), cfg)
         save_dataset(cfg, 2, df2)
 
     if 3 in strategies:
         print("Strategy 3: few-shot")
-        df3 = generate_few_shot(llm, model_name, df, wrap_prompt(p.strategy_3.prompt, cfg), cfg)
+        df3 = generate_few_shot(client, model_name, df, wrap_prompt(p.strategy_3.prompt, cfg), cfg)
         save_dataset(cfg, 3, df3)
 
     if 4 in strategies:
         print("Strategy 4: style extraction + generation")
         df4 = generate_with_content(
-            llm, model_name, df,
+            client, model_name, df,
             wrap_prompt(p.strategy_4.prompt_1, cfg),
             wrap_prompt(p.strategy_4.prompt_2, cfg),
             cfg,
@@ -185,7 +166,7 @@ def main(cfg: DictConfig) -> None:
     if 5 in strategies:
         print("Strategy 5: outline + essay")
         df5 = generate_with_plan(
-            llm, model_name, df,
+            client, model_name, df,
             wrap_prompt(p.strategy_5.prompt_1, cfg),
             wrap_prompt(p.strategy_5.prompt_2, cfg),
             cfg,
