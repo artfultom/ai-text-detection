@@ -97,3 +97,4 @@ settings.local.py
 /data
 /datasets
 /models
+/emb_cache
