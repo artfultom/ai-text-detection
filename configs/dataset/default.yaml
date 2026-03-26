@@ -1,6 +1,6 @@
 input_path: "data/combined_essays.jsonl"
-human_path: "datasets1/ivy_panda_essays.csv"
-output_dir: "datasets1" # TODO
+human_path: "datasets/ivy_panda_essays.csv"
+output_dir: "datasets"
 
 sources:
   ivy_panda:
