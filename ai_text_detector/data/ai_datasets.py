@@ -1,4 +1,3 @@
-import math
 import os
 import re
 
@@ -15,11 +14,10 @@ def generate_response(client: BaseClient, prompt: str, cfg: DictConfig) -> str:
 
 def word_count(text: str) -> int:
     words = re.findall(r"\b\w+\b", text)
-    return math.floor(len(words) / 100) * 100
+    return round(len(words) / 50) * 50
 
 
 def wrap_prompt(raw: str, cfg: DictConfig) -> str:
-    """Wraps prompt with model-specific tokens for local models; passthrough for API models."""
     if cfg.model.provider == "local":
         return f"{cfg.model.prompt_start}\n{raw}\n{cfg.model.prompt_end}"
     return raw
