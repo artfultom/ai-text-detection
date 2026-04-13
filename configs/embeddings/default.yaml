@@ -1,0 +1,10 @@
+input_dir: datasets
+output_dir: emb_cache
+models:
+  - all-MiniLM-L6-v2
+  - all-mpnet-base-v2
+  - intfloat/e5-base
+batch_size: 32
+sources:
+  ivy_panda:
+    input_file: ivy_panda_essays.csv

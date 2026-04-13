@@ -3,9 +3,11 @@ defaults:
   - generation: default
   - prompts: prompts
   - dataset: default
+  - embeddings: default
   - _self_
 
 run:
   start: 0
   count: 1
   seed: 42
+  device: mps

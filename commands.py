@@ -4,11 +4,15 @@ import sys
 COMMANDS: dict[str, tuple[str, str]] = {
     "generate_ai": (
         "ai_text_detector/data/ai_datasets.py",
-        "Generate AI essays with local LLMs (Mistral / LLaMA) using 5 prompt strategies",
+        "Generate AI essays using prompt strategies",
     ),
     "download_datasets": (
         "ai_text_detector/data/human_datasets.py",
         "Parse combined_essays.jsonl and split into IvyPanda / ASAP2 / PERSUADE CSVs",
+    ),
+    "generate_embeddings": (
+        "ai_text_detector/data/embeddings.py",
+        "Generate embeddings of the datasets",
     ),
 }
 
