@@ -2,12 +2,9 @@ import os
 import time
 from abc import ABC, abstractmethod
 
-from dotenv import load_dotenv
 from llama_cpp import Llama
 from omegaconf import DictConfig
 from openai import OpenAI
-
-load_dotenv()
 
 
 class BaseClient(ABC):

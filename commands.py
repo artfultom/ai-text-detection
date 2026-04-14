@@ -1,6 +1,8 @@
 import subprocess
 import sys
 
+from dotenv import load_dotenv
+
 COMMANDS: dict[str, tuple[str, str]] = {
     "generate_ai": (
         "ai_text_detector/data/ai_datasets.py",
@@ -40,6 +42,8 @@ def run_command(name: str, extra_args: list[str]) -> int:
 
 
 def main() -> None:
+    load_dotenv()
+
     args = sys.argv[1:]
 
     if not args or args[0] in ("-h", "--help", "help"):
