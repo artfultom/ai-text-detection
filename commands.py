@@ -5,15 +5,15 @@ from dotenv import load_dotenv
 
 COMMANDS: dict[str, tuple[str, str]] = {
     "generate_ai": (
-        "ai_text_detector/data/ai_datasets.py",
+        "ai_text_detector.data.ai_datasets",
         "Generate AI essays using prompt strategies",
     ),
     "download_datasets": (
-        "ai_text_detector/data/human_datasets.py",
+        "ai_text_detector.data.human_datasets",
         "Parse combined_essays.jsonl and split into IvyPanda / ASAP2 / PERSUADE CSVs",
     ),
     "generate_embeddings": (
-        "ai_text_detector/data/embeddings.py",
+        "ai_text_detector.data.embeddings",
         "Generate embeddings of the datasets",
     ),
 }
@@ -34,8 +34,9 @@ def run_command(name: str, extra_args: list[str]) -> int:
         print(f"Available: {', '.join(COMMANDS)}")
         return 1
 
-    script, _ = COMMANDS[name]
-    cmd = [sys.executable, script, *extra_args]
+    module, _ = COMMANDS[name]
+
+    cmd = [sys.executable, "-m", module, *extra_args]
     print(f"Running: {' '.join(cmd)}\n")
     result = subprocess.run(cmd)
     return result.returncode
