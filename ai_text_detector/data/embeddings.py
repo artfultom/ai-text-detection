@@ -33,7 +33,6 @@ def compute_embeddings(
         model_name: str,
         device: str,
         embed_cfg,
-        norm: bool,
 ) -> tuple[np.ndarray, list[int]]:
     print(f"Computing embeddings for {model_name}...")
 
@@ -52,7 +51,7 @@ def compute_embeddings(
     all_embeddings = model.encode(
         all_sentences,
         batch_size=embed_cfg.batch_size,
-        normalize_embeddings=norm,
+        normalize_embeddings=False,
         show_progress_bar=True,
         device=device,
     )
@@ -65,20 +64,17 @@ def save_embeddings(
         all_embeddings: np.ndarray,
         sentence_counts: list[int],
         embed_cfg,
-        key: str,
         model_name: str,
-        norm: bool,
 ) -> None:
-    norm_str = "_norm" if norm else ""
     cache_key = _compute_hash(texts, model_name)
 
     output_path = os.path.join(
         embed_cfg.output_dir,
-        f"{key}_{model_name.replace('/', '_')}{norm_str}_{cache_key}_sentences",
+        f"{model_name.replace('/', '_')}_{cache_key}_sentences",
     )
     output_counts_path = os.path.join(
         embed_cfg.output_dir,
-        f"{key}_{model_name.replace('/', '_')}{norm_str}_{cache_key}_counts",
+        f"{model_name.replace('/', '_')}_{cache_key}_counts",
     )
 
     np.savez_compressed(output_path, embeddings=all_embeddings)
@@ -100,20 +96,18 @@ def main(cfg: DictConfig) -> None:
 
     for model_name in embed_cfg.models:
         print(f"\n=== Model: {model_name} ===")
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(model_name, device=device)
 
         for key, source_cfg in embed_cfg.sources.items():
-            print(f"\n  Source: {key}")
-            for norm in [True, False]:
-                input_path = os.path.join(embed_cfg.input_dir, source_cfg.input_file)
+            print(f"\n=== Source: {key}")
+            input_path = os.path.join(embed_cfg.input_dir, source_cfg.input_file)
 
-                df = load_essays(input_path)
-                texts = df["text"].dropna().tolist()
+            df = load_essays(input_path)
+            texts = df["text"].dropna().tolist()
 
-                all_embeddings, sentence_counts = compute_embeddings(
-                    texts, model, model_name, device, embed_cfg, norm
-                )
-                save_embeddings(texts, all_embeddings, sentence_counts, embed_cfg, key, model_name, norm)
+            all_embeddings, sentence_counts = compute_embeddings(texts, model, model_name, device, embed_cfg)
+
+            save_embeddings(texts, all_embeddings, sentence_counts, embed_cfg, model_name)
 
     print("Done.")
 
