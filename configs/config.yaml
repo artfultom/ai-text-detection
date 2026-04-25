@@ -4,6 +4,7 @@ defaults:
   - prompts: prompts
   - dataset: default
   - embeddings: default
+  - train: default
   - _self_
 
 run:

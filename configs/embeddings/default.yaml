@@ -1,37 +1,29 @@
 input_dir: datasets
 output_dir: emb_cache
 models:
-  - all-MiniLM-L6-v2
   - all-mpnet-base-v2
-  - intfloat/e5-base
 batch_size: 32
 sources:
-  train_data:
+  human_data:
     - path: ivy_panda_essays.csv
-  test_data:
-    - path: chatgpt_essays_1.csv
-    - path: chatgpt_essays_2.csv
-    - path: chatgpt_essays_3.csv
-    - path: chatgpt_essays_4.csv
-    - path: chatgpt_essays_5.csv
-    - path: deepseek_essays_1.csv
-    - path: deepseek_essays_2.csv
-    - path: deepseek_essays_3.csv
-    - path: deepseek_essays_4.csv
-    - path: deepseek_essays_5.csv
-    - path: llama_essays_1.csv
-    - path: llama_essays_2.csv
-    - path: llama_essays_3.csv
-    - path: llama_essays_4.csv
-    - path: llama_essays_5.csv
+  ai_data:
     - path: mistral_essays_1.csv
     - path: mistral_essays_2.csv
     - path: mistral_essays_3.csv
     - path: mistral_essays_4.csv
     - path: mistral_essays_5.csv
-    - path: ivy_panda_essays.csv
-      n_from_pattern:
-        - "chatgpt_essays_*.csv"
-        - "deepseek_essays_*.csv"
-        - "llama_essays_*.csv"
-        - "mistral_essays_*.csv"
+    - path: llama_essays_1.csv
+    - path: llama_essays_2.csv
+    - path: llama_essays_3.csv
+    - path: llama_essays_4.csv
+    - path: llama_essays_5.csv
+    - path: deepseek_essays_1.csv
+    - path: deepseek_essays_2.csv
+    - path: deepseek_essays_3.csv
+    - path: deepseek_essays_4.csv
+    - path: deepseek_essays_5.csv
+    - path: chatgpt_essays_1.csv
+    - path: chatgpt_essays_2.csv
+    - path: chatgpt_essays_3.csv
+    - path: chatgpt_essays_4.csv
+    - path: chatgpt_essays_5.csv

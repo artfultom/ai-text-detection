@@ -16,6 +16,10 @@ COMMANDS: dict[str, tuple[str, str]] = {
         "ai_text_detector.data.embeddings",
         "Generate embeddings of the datasets",
     ),
+    "train": (
+        "ai_text_detector.train.train",
+        "Train model",
+    ),
 }
 
 

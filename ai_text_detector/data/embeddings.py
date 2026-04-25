@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
 from sentence_transformers import SentenceTransformer
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from ai_text_detector.utils.logging import log, section
@@ -20,7 +21,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 def load_essays(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8")
 
-    log(f"Loaded {len(df):,} rows from {os.path.basename(path)}", 1)
+    log(f"Loaded {len(df):,} rows from {os.path.basename(path)}", 2)
 
     return df
 
@@ -73,6 +74,40 @@ def load_source(cfg, source_cfg, input_dir: str) -> pd.DataFrame:
     return df
 
 
+def build_datasets(cfg, embed_cfg):
+    input_dir = embed_cfg.input_dir
+    seed = cfg.run.seed
+
+    ai_dfs = []
+    for file_cfg in embed_cfg.sources["ai_data"]:
+        path = os.path.join(input_dir, file_cfg.path)
+        df = load_essays(path)
+        ai_dfs.append(df)
+
+    df_ai = pd.concat(ai_dfs, ignore_index=True)
+    df_ai["label"] = 1
+
+    human_cfg = embed_cfg.sources["human_data"][0]
+    path = os.path.join(input_dir, human_cfg.path)
+
+    df_human = load_essays(path)
+    df_human["label"] = 0
+
+    df_train, df_human_test = train_test_split(
+        df_human,
+        test_size=len(df_ai),
+        random_state=seed,
+    )
+
+    df_test = pd.concat([df_ai, df_human_test], ignore_index=True)
+    df_test = df_test.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    log(f"Train size: {len(df_train):,} (human only)", 1)
+    log(f"Test size:  {len(df_test):,} (AI + human)", 1)
+
+    return df_train, df_test
+
+
 def compute_embeddings(
         data: list[str],
         model: SentenceTransformer,
@@ -100,7 +135,7 @@ def compute_embeddings(
     embeddings = model.encode(
         all_sentences,
         batch_size=embed_cfg.batch_size,
-        normalize_embeddings=False,
+        normalize_embeddings=True,
         show_progress_bar=True,
         device=device,
     )
@@ -122,8 +157,8 @@ def save_embeddings(
     output_path = os.path.join(embed_cfg.output_dir, f"{base}_sentences")
     output_counts_path = os.path.join(embed_cfg.output_dir, f"{base}_counts")
 
-    np.savez_compressed(output_path, embeddings=all_embeddings)
-    np.savez_compressed(output_counts_path, counts=np.array(sentence_counts))
+    np.save(output_path, all_embeddings)
+    np.save(output_counts_path, np.array(sentence_counts))
 
     log(f"Saved embeddings → {output_path}", 1)
     log(f"Saved counts     → {output_counts_path}", 1)
@@ -142,15 +177,36 @@ def main(cfg: DictConfig) -> None:
         section(f"MODEL: {model_name}")
         model = SentenceTransformer(model_name, device=device)
 
-        for key, source_cfg in embed_cfg.sources.items():
-            section(f"SOURCE: {key}")
+        df_train, df_test = build_datasets(cfg, embed_cfg)
 
-            df = load_source(cfg, source_cfg, embed_cfg.input_dir)
-            texts = df["text"].dropna().tolist()
+        train_texts = df_train["text"].dropna().tolist()
+        test_texts = df_test["text"].dropna().tolist()
 
-            embeddings, counts = compute_embeddings(texts, model, model_name, device, embed_cfg)
+        section("ENCODING TRAIN")
+        train_emb, train_counts = compute_embeddings(
+            train_texts, model, model_name, device, embed_cfg
+        )
 
-            save_embeddings(texts, embeddings, counts, embed_cfg, model_name)
+        save_embeddings(
+            train_texts,
+            train_emb,
+            train_counts,
+            embed_cfg,
+            model_name
+        )
+
+        section("ENCODING TEST")
+        test_emb, test_counts = compute_embeddings(
+            test_texts, model, model_name, device, embed_cfg
+        )
+
+        save_embeddings(
+            test_texts,
+            test_emb,
+            test_counts,
+            embed_cfg,
+            model_name
+        )
 
     section("DONE")
 
