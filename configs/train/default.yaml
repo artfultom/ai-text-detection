@@ -12,3 +12,8 @@ tune:
   bottleneck_sizes: [8, 16, 32, 64]
   lr_min: 1.0e-4
   lr_max: 1.0e-2
+huggingface:
+  upload: true
+  repo_id: "artfultom/ae-ai-text-detector"
+  token: null
+  readme_template: "configs/model_readme_template.md"

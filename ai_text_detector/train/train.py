@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from huggingface_hub import HfApi, upload_file
 from omegaconf import DictConfig
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import train_test_split
@@ -271,6 +272,56 @@ def tune_ae(
     return best
 
 
+def upload_best_model_to_hf(
+        ae: AE,
+        metadata: dict,
+        repo_id: str,
+        token: str,
+        output_dir: str,
+        readme_template_path: str | None = None,
+) -> None:
+    api = HfApi()
+    api.create_repo(repo_id=repo_id, token=token, exist_ok=True, repo_type="model")
+
+    safe_model = metadata["model"].replace("/", "_")
+    weights_filename = f"ae_{safe_model}_best.pt"
+    weights_path = os.path.join(output_dir, weights_filename)
+    torch.save({"state_dict": ae.state_dict(), "metadata": metadata}, weights_path)
+    log(f"Saved model weights → {weights_path}", 1)
+
+    upload_file(
+        path_or_fileobj=weights_path,
+        path_in_repo=weights_filename,
+        repo_id=repo_id,
+        token=token,
+        commit_message=f"Upload best AE model ({metadata['model']}, roc_auc={metadata['roc_auc']})",
+    )
+    log(f"Uploaded {weights_filename} → hf.co/{repo_id}", 1)
+
+    if readme_template_path and os.path.exists(readme_template_path):
+        with open(readme_template_path, "r") as f:
+            template = f.read()
+        readme_content = template.format_map(metadata)
+        log(f"Using README template from {readme_template_path}", 1)
+    else:
+        if readme_template_path:
+            log(f"WARNING: template not found at {readme_template_path}, using default", 1)
+        readme_content = f"# AI Text Detector\n\nModel: `{metadata['model']}`\nROC-AUC: {metadata['roc_auc']}\n"
+
+    readme_path = os.path.join(output_dir, "README.md")
+    with open(readme_path, "w") as f:
+        f.write(readme_content)
+
+    upload_file(
+        path_or_fileobj=readme_path,
+        path_in_repo="README.md",
+        repo_id=repo_id,
+        token=token,
+        commit_message="Add README",
+    )
+    log("Uploaded README.md", 1)
+
+
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
     train_cfg = cfg.train
@@ -285,6 +336,9 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(train_cfg.output_dir, exist_ok=True)
 
     all_rows = []
+    best_ae: AE | None = None
+    best_roc_auc: float = -1.0
+    best_metadata: dict = {}
 
     for model_name in train_cfg.models:
         section(f"MODEL: {model_name}")
@@ -320,28 +374,43 @@ def main(cfg: DictConfig) -> None:
         best_params = tune_ae(X_train, device, train_cfg.tune)
 
         log("Training final AE with best hyperparameters...", 1)
-        scores = ae_score(
-            X_train, X_test,
-            device=device,
+        n_val = max(1, int(len(X_train) * train_cfg.tune.val_fraction))
+        X_tr_fin = X_train[n_val:]
+        X_val_fin = X_train[:n_val]
+
+        ae = AE(X_train.shape[1], best_params["hidden"], best_params["bottleneck"]).to(device)
+        _train_ae(
+            ae, X_tr_fin, X_val_fin, device,
             max_epochs=train_cfg.tune.max_epochs,
             batch_size=train_cfg.tune.batch_size,
-            hidden=best_params["hidden"],
-            bottleneck=best_params["bottleneck"],
             lr=best_params["lr"],
             patience=train_cfg.ae_patience,
-            val_fraction=train_cfg.tune.val_fraction,
         )
 
-        all_rows.append({
+        ae.eval()
+        with torch.no_grad():
+            recon = ae(torch.tensor(X_test, dtype=torch.float32).to(device)).cpu().numpy()
+        scores = np.mean((X_test - recon) ** 2, axis=1)
+
+        roc_auc = round(roc_auc_score(y_test, scores), 4)
+        pr_auc = round(average_precision_score(y_test, scores), 4)
+
+        row = {
             "model": model_name,
             "pooling": "mean + mean_diff",
             "hidden": best_params["hidden"],
             "bottleneck": best_params["bottleneck"],
             "lr": round(best_params["lr"], 6),
-            "roc_auc": round(roc_auc_score(y_test, scores), 4),
-            "pr_auc": round(average_precision_score(y_test, scores), 4),
-        })
+            "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
+        }
+        all_rows.append(row)
         log("  pooling='mean + mean_diff' — DONE", 1)
+
+        if roc_auc > best_roc_auc:
+            best_roc_auc = roc_auc
+            best_ae = ae
+            best_metadata = row
 
     section("RESULTS")
 
@@ -352,6 +421,18 @@ def main(cfg: DictConfig) -> None:
     out_path = os.path.join(train_cfg.output_dir, "results.csv")
     df_results.to_csv(out_path, index=False)
     log(f"Full results saved - {out_path}", 1)
+
+    hf_cfg = train_cfg.get("huggingface", None)
+    if hf_cfg and hf_cfg.get("upload", False) and best_ae is not None:
+        section("UPLOAD TO HUGGING FACE")
+        upload_best_model_to_hf(
+            ae=best_ae,
+            metadata=best_metadata,
+            repo_id=hf_cfg.repo_id,
+            token=hf_cfg.get("token") or os.environ["HF_TOKEN"],
+            output_dir=train_cfg.output_dir,
+            readme_template_path=hf_cfg.get("readme_template"),
+        )
 
     section("DONE")
 
