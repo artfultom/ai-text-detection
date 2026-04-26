@@ -98,3 +98,4 @@ settings.local.py
 /datasets
 /models
 /emb_cache
+/train_results/

@@ -5,7 +5,6 @@ import random
 
 import hydra
 import numpy as np
-import optuna
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -19,7 +18,6 @@ from tqdm import tqdm
 from ai_text_detector.utils.logging import log, section
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
-optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
 def _compute_hash(data: list[str], model_name: str) -> str:
@@ -140,40 +138,46 @@ def build_document_poolings(
 
 
 class AE(nn.Module):
-    def __init__(self, dim: int, hidden: int, bottleneck: int):
+    def __init__(self, dim: int):
         super().__init__()
         self.enc = nn.Sequential(
-            nn.Linear(dim, hidden),
+            nn.Linear(dim, 128),
             nn.ReLU(),
-            nn.Linear(hidden, bottleneck),
+            nn.Linear(128, 32),
             nn.ReLU(),
         )
         self.dec = nn.Sequential(
-            nn.Linear(bottleneck, hidden),
+            nn.Linear(32, 128),
             nn.ReLU(),
-            nn.Linear(hidden, dim),
+            nn.Linear(128, dim),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return self.dec(self.enc(x))
 
 
-def _train_ae(
+def train_ae(
         ae: AE,
         X_train: np.ndarray,
-        X_val: np.ndarray,
         device: str,
-        max_epochs: int,
+        n_epochs: int,
         batch_size: int,
         lr: float,
-        patience: int,
-) -> float:
-    ae.train()
+        val_fraction: float = 0.1,
+        patience: int = 5,
+) -> None:
+    n_val = max(1, int(len(X_train) * val_fraction))
+    X_val = X_train[:n_val]
+    X_tr = X_train[n_val:]
+
     opt = torch.optim.Adam(ae.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
+
     loader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32)),
-        batch_size=batch_size, shuffle=True, drop_last=False,
+        torch.utils.data.TensorDataset(torch.tensor(X_tr, dtype=torch.float32)),
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
     )
     X_val_t = torch.tensor(X_val, dtype=torch.float32).to(device)
 
@@ -181,7 +185,7 @@ def _train_ae(
     no_improve = 0
     best_state = None
 
-    for _ in range(max_epochs):
+    for _ in range(n_epochs):
         ae.train()
         for (batch,) in loader:
             batch = batch.to(device)
@@ -205,71 +209,7 @@ def _train_ae(
 
     if best_state is not None:
         ae.load_state_dict(best_state)
-
-    return best_val
-
-
-def ae_score(
-        X_train: np.ndarray,
-        X_test: np.ndarray,
-        device: str,
-        max_epochs: int,
-        batch_size: int,
-        hidden: int,
-        bottleneck: int,
-        lr: float,
-        patience: int,
-        val_fraction: float,
-) -> np.ndarray:
-    n_val = max(1, int(len(X_train) * val_fraction))
-    X_tr = X_train[n_val:]
-    X_val = X_train[:n_val]
-
-    ae = AE(X_train.shape[1], hidden, bottleneck).to(device)
-    _train_ae(ae, X_tr, X_val, device, max_epochs, batch_size, lr, patience)
-
-    ae.eval()
-    with torch.no_grad():
-        recon = ae(torch.tensor(X_test, dtype=torch.float32).to(device)).cpu().numpy()
-
-    return np.mean((X_test - recon) ** 2, axis=1)
-
-
-def tune_ae(
-        X_train: np.ndarray,
-        device: str,
-        tune_cfg,
-) -> dict:
-    n_val = max(1, int(len(X_train) * tune_cfg.val_fraction))
-    X_tr = X_train[n_val:]
-    X_val = X_train[:n_val]
-
-    def objective(trial: optuna.Trial) -> float:
-        hidden = trial.suggest_categorical("hidden", tune_cfg.hidden_sizes)
-        bottleneck = trial.suggest_categorical("bottleneck", tune_cfg.bottleneck_sizes)
-        lr = trial.suggest_float("lr", tune_cfg.lr_min, tune_cfg.lr_max, log=True)
-
-        if bottleneck >= hidden:
-            raise optuna.exceptions.TrialPruned()
-
-        ae = AE(X_train.shape[1], hidden, bottleneck).to(device)
-        val_loss = _train_ae(
-            ae, X_tr, X_val, device,
-            max_epochs=tune_cfg.max_epochs,
-            batch_size=tune_cfg.batch_size,
-            lr=lr,
-            patience=tune_cfg.patience,
-        )
-        return val_loss
-
-    study = optuna.create_study(direction="minimize")
-    study.optimize(objective, n_trials=tune_cfg.n_trials, show_progress_bar=False)
-
-    best = study.best_params
-    log(f"Best hyperparams: {best}", 1)
-    log(f"Best val loss:    {study.best_value:.6f}", 1)
-
-    return best
+        ae.to(device)
 
 
 def upload_best_model_to_hf(
@@ -296,7 +236,7 @@ def upload_best_model_to_hf(
         token=token,
         commit_message=f"Upload best AE model ({metadata['model']}, roc_auc={metadata['roc_auc']})",
     )
-    log(f"Uploaded {weights_filename} → hf.co/{repo_id}", 1)
+    log(f"Uploaded {weights_filename} - hf.co/{repo_id}", 1)
 
     if readme_template_path and os.path.exists(readme_template_path):
         with open(readme_template_path, "r") as f:
@@ -370,20 +310,16 @@ def main(cfg: DictConfig) -> None:
         X_train = np.concatenate([mean_train * 1.0, np.array(train_pools[1]) * 1.2], axis=1)
         X_test = np.concatenate([mean_test * 1.0, np.array(test_pools[1]) * 1.2], axis=1)
 
-        log("Tuning AE hyperparameters with Optuna...", 1)
-        best_params = tune_ae(X_train, device, train_cfg.tune)
-
-        log("Training final AE with best hyperparameters...", 1)
-        n_val = max(1, int(len(X_train) * train_cfg.tune.val_fraction))
-        X_tr_fin = X_train[n_val:]
-        X_val_fin = X_train[:n_val]
-
-        ae = AE(X_train.shape[1], best_params["hidden"], best_params["bottleneck"]).to(device)
-        _train_ae(
-            ae, X_tr_fin, X_val_fin, device,
-            max_epochs=train_cfg.tune.max_epochs,
-            batch_size=train_cfg.tune.batch_size,
-            lr=best_params["lr"],
+        log("Training AE...", 1)
+        ae = AE(X_train.shape[1]).to(device)
+        train_ae(
+            ae,
+            X_train,
+            device=device,
+            n_epochs=train_cfg.ae_epochs,
+            batch_size=train_cfg.ae_batch_size,
+            lr=train_cfg.ae_lr,
+            val_fraction=train_cfg.ae_val_fraction,
             patience=train_cfg.ae_patience,
         )
 
@@ -398,14 +334,11 @@ def main(cfg: DictConfig) -> None:
         row = {
             "model": model_name,
             "pooling": "mean + mean_diff",
-            "hidden": best_params["hidden"],
-            "bottleneck": best_params["bottleneck"],
-            "lr": round(best_params["lr"], 6),
             "roc_auc": roc_auc,
             "pr_auc": pr_auc,
         }
         all_rows.append(row)
-        log("  pooling='mean + mean_diff' — DONE", 1)
+        log(f"  pooling='mean + mean_diff' — ROC-AUC={roc_auc}, PR-AUC={pr_auc}", 1)
 
         if roc_auc > best_roc_auc:
             best_roc_auc = roc_auc
@@ -415,8 +348,7 @@ def main(cfg: DictConfig) -> None:
     section("RESULTS")
 
     df_results = pd.DataFrame(all_rows)
-    print(df_results[["model", "pooling", "hidden", "bottleneck", "lr", "roc_auc", "pr_auc"]].to_string(
-        index=False))
+    print(df_results[["model", "pooling", "roc_auc", "pr_auc"]].to_string(index=False))
 
     out_path = os.path.join(train_cfg.output_dir, "results.csv")
     df_results.to_csv(out_path, index=False)
