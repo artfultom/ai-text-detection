@@ -261,6 +261,42 @@ def upload_best_model_to_hf(
     )
     log("Uploaded README.md", 1)
 
+def ae_score(X_train, X_test, train_cfg, device):
+    d = X_train.shape[1]
+
+    ae = AE(d).to(device)
+    ae.train()
+
+    opt = torch.optim.Adam(ae.parameters(), lr=1e-3)
+    loss_fn = nn.MSELoss()
+
+    Xtr = torch.tensor(X_train, dtype=torch.float32)
+    dataset = torch.utils.data.TensorDataset(Xtr)
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=train_cfg.ae_batch_size,
+        shuffle=True,
+        drop_last=False
+    )
+
+    for epoch in range(train_cfg.ae_epochs):
+        for (batch,) in loader:
+            batch = batch.to(device)
+
+            out = ae(batch)
+            loss = loss_fn(out, batch)
+
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+
+    ae.eval()
+    Xe = torch.tensor(X_test, dtype=torch.float32).to(device)
+
+    with torch.no_grad():
+        recon = ae(Xe).cpu().numpy()
+
+    return np.mean((X_test - recon) ** 2, axis=1), ae
 
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
@@ -311,22 +347,7 @@ def main(cfg: DictConfig) -> None:
         X_test = np.concatenate([mean_test * 1.0, np.array(test_pools[1]) * 1.2], axis=1)
 
         log("Training AE...", 1)
-        ae = AE(X_train.shape[1]).to(device)
-        train_ae(
-            ae,
-            X_train,
-            device=device,
-            n_epochs=train_cfg.ae_epochs,
-            batch_size=train_cfg.ae_batch_size,
-            lr=train_cfg.ae_lr,
-            val_fraction=train_cfg.ae_val_fraction,
-            patience=train_cfg.ae_patience,
-        )
-
-        ae.eval()
-        with torch.no_grad():
-            recon = ae(torch.tensor(X_test, dtype=torch.float32).to(device)).cpu().numpy()
-        scores = np.mean((X_test - recon) ** 2, axis=1)
+        scores, ae = ae_score(X_train, X_test, train_cfg, device)
 
         roc_auc = round(roc_auc_score(y_test, scores), 4)
         pr_auc = round(average_precision_score(y_test, scores), 4)
