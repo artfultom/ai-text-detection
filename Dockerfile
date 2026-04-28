@@ -10,6 +10,7 @@ COPY requirements.serve.txt .
 RUN pip install --no-cache-dir -r requirements.serve.txt
 
 COPY serve.py .
+COPY ai_text_detector ./ai_text_detector
 
 RUN mkdir -p /app/train_results
 

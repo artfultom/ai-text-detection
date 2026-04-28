@@ -7,7 +7,6 @@ from typing import Optional
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -15,6 +14,9 @@ from fastapi.responses import JSONResponse
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
+
+from ai_text_detector.inference.state import AppState
+from ai_text_detector.train.models import AE
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -26,30 +28,6 @@ ENCODER_NAME = os.environ.get("ENCODER_NAME", "")
 DEVICE = os.environ.get("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 PORT = int(os.environ.get("PORT", "8000"))
 THRESHOLD = float(os.environ["THRESHOLD"]) if "THRESHOLD" in os.environ else None
-
-
-class AE(nn.Module):
-    def __init__(self, dim: int):
-        super().__init__()
-        self.enc = nn.Sequential(
-            nn.Linear(dim, 128), nn.ReLU(),
-            nn.Linear(128, 32), nn.ReLU(),
-        )
-        self.dec = nn.Sequential(
-            nn.Linear(32, 128), nn.ReLU(),
-            nn.Linear(128, dim),
-        )
-
-    def forward(self, x):
-        return self.dec(self.enc(x))
-
-
-class AppState:
-    ae: AE
-    encoder: SentenceTransformer
-    metadata: dict
-    device: str
-
 
 state = AppState()
 

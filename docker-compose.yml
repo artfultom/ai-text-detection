@@ -1,7 +1,7 @@
 services:
   detector:
     build:
-      context: ./ai_text_detector/inference
+      context: .
       dockerfile: Dockerfile
     image: ai-text-detector:latest
     container_name: ai-text-detector
