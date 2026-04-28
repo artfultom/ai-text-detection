@@ -8,16 +8,17 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from omegaconf import DictConfig
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
+from ai_text_detector.train.embeddings import compute_poolings
 from ai_text_detector.train.models import AE, upload_best_model_to_hf
-from ai_text_detector.utils.logging import log, section
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+log = logging.getLogger("train")
 
 
 def _compute_hash(data: list[str], model_name: str) -> str:
@@ -55,8 +56,8 @@ def build_datasets(cfg, embed_cfg):
     df_test = pd.concat([df_ai, df_human_test], ignore_index=True)
     df_test = df_test.sample(frac=1, random_state=seed).reset_index(drop=True)
 
-    log(f"Train size: {len(df_train):,} (human)", 1)
-    log(f"Test size:  {len(df_test):,} (AI + human)", 1)
+    log.info(f"Train size: {len(df_train):,} (human)")
+    log.info(f"Test size:  {len(df_test):,} (AI + human)")
 
     return df_train, df_test
 
@@ -80,30 +81,10 @@ def load_sentence_embeddings(
     embeddings = np.load(emb_path)
     counts = np.load(counts_path)
 
-    log(f"Loaded embeddings {embeddings.shape} \t- {os.path.basename(emb_path)}", 2)
-    log(f"Loaded counts     {counts.shape}     \t- {os.path.basename(counts_path)}", 2)
+    log.info(f"Loaded embeddings {embeddings.shape} \t- {os.path.basename(emb_path)}")
+    log.info(f"Loaded counts     {counts.shape}     \t- {os.path.basename(counts_path)}")
 
     return embeddings, counts
-
-
-def _normalize_vec(v: np.ndarray) -> np.ndarray:
-    t = torch.from_numpy(v).float()
-    t = F.normalize(t, p=2, dim=0)
-
-    return t.numpy()
-
-
-def compute_poolings(emb: np.ndarray) -> tuple[np.ndarray, ...]:
-    mean_val = np.mean(emb, axis=0)
-
-    diffs = emb[1:] - emb[:-1]
-    mean_diff_val = np.mean(diffs, axis=0) if len(diffs) else np.zeros_like(mean_val)
-    mean_diff_val = _normalize_vec(mean_diff_val)
-
-    return (
-        mean_val,
-        mean_diff_val,
-    )
 
 
 POOLING_NAMES = [
@@ -250,26 +231,26 @@ def main(cfg: DictConfig) -> None:
     best_metadata: dict = {}
 
     for model_name in train_cfg.models:
-        section(f"MODEL: {model_name}")
+        log.info(f"MODEL: {model_name}")
 
-        section("BUILD DATASETS")
+        log.info("BUILD DATASETS")
         df_train, df_test = build_datasets(cfg, embed_cfg)
 
         train_texts = df_train["text"].tolist()
         test_texts = df_test["text"].tolist()
         y_test = df_test["label"].values.astype(int)
 
-        log("Loading train embeddings...", 1)
+        log.info("Loading train embeddings...")
         train_emb_raw, train_counts = load_sentence_embeddings(
             embed_cfg.output_dir, model_name, train_texts
         )
 
-        log("Loading test embeddings...", 1)
+        log.info("Loading test embeddings...")
         test_emb_raw, test_counts = load_sentence_embeddings(
             embed_cfg.output_dir, model_name, test_texts
         )
 
-        log("Building poolings...", 1)
+        log.info("Building poolings...")
         train_pools = build_document_poolings(train_emb_raw, train_counts)
         test_pools = build_document_poolings(test_emb_raw, test_counts)
 
@@ -279,7 +260,7 @@ def main(cfg: DictConfig) -> None:
         X_train = np.concatenate([mean_train * 1.0, np.array(train_pools[1]) * 1.2], axis=1)
         X_test = np.concatenate([mean_test * 1.0, np.array(test_pools[1]) * 1.2], axis=1)
 
-        log("Training AE...", 1)
+        log.info("Training AE...")
         scores, ae = ae_score(X_train, X_test, train_cfg, device)
 
         roc_auc = round(roc_auc_score(y_test, scores), 4)
@@ -292,25 +273,25 @@ def main(cfg: DictConfig) -> None:
             "pr_auc": pr_auc,
         }
         all_rows.append(row)
-        log(f"  pooling='mean + mean_diff' — ROC-AUC={roc_auc}, PR-AUC={pr_auc}", 1)
+        log.info(f"  pooling='mean + mean_diff' — ROC-AUC={roc_auc}, PR-AUC={pr_auc}")
 
         if roc_auc > best_roc_auc:
             best_roc_auc = roc_auc
             best_ae = ae
             best_metadata = row
 
-    section("RESULTS")
+    log.info("RESULTS")
 
     df_results = pd.DataFrame(all_rows)
     print(df_results[["model", "pooling", "roc_auc", "pr_auc"]].to_string(index=False))
 
     out_path = os.path.join(train_cfg.output_dir, "results.csv")
     df_results.to_csv(out_path, index=False)
-    log(f"Full results saved - {out_path}", 1)
+    log.info(f"Full results saved - {out_path}")
 
     hf_cfg = train_cfg.get("huggingface", None)
     if hf_cfg and hf_cfg.get("upload", False) and best_ae is not None:
-        section("UPLOAD TO HUGGING FACE")
+        log.info("UPLOAD TO HUGGING FACE")
         upload_best_model_to_hf(
             ae=best_ae,
             metadata=best_metadata,
@@ -320,7 +301,7 @@ def main(cfg: DictConfig) -> None:
             readme_template_path=hf_cfg.get("readme_template"),
         )
 
-    section("DONE")
+    log.info("DONE")
 
 
 if __name__ == "__main__":

@@ -13,15 +13,15 @@ from sentence_transformers import SentenceTransformer
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from ai_text_detector.utils.logging import log, section
-
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+log = logging.getLogger("embeddings")
 
 
 def load_essays(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8")
 
-    log(f"Loaded {len(df):,} rows from {os.path.basename(path)}", 2)
+    log.info(f"Loaded {len(df):,} rows from {os.path.basename(path)}", 2)
 
     return df
 
@@ -44,10 +44,10 @@ def count_rows_by_pattern(input_dir: str, patterns: list[str]) -> int:
             raise ValueError(f"No files matched pattern: {pattern}")
 
         count = sum(len(pd.read_csv(p)) for p in paths)
-        log(f"{pattern} → {len(paths)} files, {count:,} rows", 2)
+        log.info(f"{pattern} → {len(paths)} files, {count:,} rows", 2)
         total += count
 
-    log(f"Total matched rows: {total:,}", 2)
+    log.info(f"Total matched rows: {total:,}", 2)
 
     return total
 
@@ -64,12 +64,12 @@ def load_source(cfg, source_cfg, input_dir: str) -> pd.DataFrame:
             n = count_rows_by_pattern(input_dir, patterns)
 
             df = df.sample(n=min(n, len(df)), random_state=cfg.run.seed)
-            log(f"Sampled {len(df):,} rows", 1)
+            log.info(f"Sampled {len(df):,} rows", 1)
 
         dfs.append(df)
 
     df = pd.concat(dfs, ignore_index=True)
-    log(f"Final dataset size: {len(df):,}", 1)
+    log.info(f"Final dataset size: {len(df):,}", 1)
 
     return df
 
@@ -102,8 +102,8 @@ def build_datasets(cfg, embed_cfg):
     df_test = pd.concat([df_ai, df_human_test], ignore_index=True)
     df_test = df_test.sample(frac=1, random_state=seed).reset_index(drop=True)
 
-    log(f"Train size: {len(df_train):,} (human only)", 1)
-    log(f"Test size:  {len(df_test):,} (AI + human)", 1)
+    log.info(f"Train size: {len(df_train):,} (human only)", 1)
+    log.info(f"Test size:  {len(df_test):,} (AI + human)", 1)
 
     return df_train, df_test
 
@@ -128,9 +128,9 @@ def compute_embeddings(
         all_sentences.extend(sentences)
         sentence_counts.append(len(sentences))
 
-    log(f"Total sentences: {len(all_sentences):,}", 1)
+    log.info(f"Total sentences: {len(all_sentences):,}", 1)
 
-    log(f"Encoding on {device} (batch={embed_cfg.batch_size})...", 1)
+    log.info(f"Encoding on {device} (batch={embed_cfg.batch_size})...", 1)
 
     embeddings = model.encode(
         all_sentences,
@@ -160,8 +160,8 @@ def save_embeddings(
     np.save(output_path, all_embeddings)
     np.save(output_counts_path, np.array(sentence_counts))
 
-    log(f"Saved embeddings → {output_path}", 1)
-    log(f"Saved counts     → {output_counts_path}", 1)
+    log.info(f"Saved embeddings → {output_path}", 1)
+    log.info(f"Saved counts     → {output_counts_path}", 1)
 
 
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
@@ -174,7 +174,7 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(embed_cfg.output_dir, exist_ok=True)
 
     for model_name in embed_cfg.models:
-        section(f"MODEL: {model_name}")
+        log.info(f"MODEL: {model_name}")
         model = SentenceTransformer(model_name, device=device)
 
         df_train, df_test = build_datasets(cfg, embed_cfg)
@@ -182,7 +182,7 @@ def main(cfg: DictConfig) -> None:
         train_texts = df_train["text"].dropna().tolist()
         test_texts = df_test["text"].dropna().tolist()
 
-        section("ENCODING TRAIN")
+        log.info("ENCODING TRAIN")
         train_emb, train_counts = compute_embeddings(
             train_texts, model, model_name, device, embed_cfg
         )
@@ -195,7 +195,7 @@ def main(cfg: DictConfig) -> None:
             model_name
         )
 
-        section("ENCODING TEST")
+        log.info("ENCODING TEST")
         test_emb, test_counts = compute_embeddings(
             test_texts, model, model_name, device, embed_cfg
         )
@@ -208,7 +208,7 @@ def main(cfg: DictConfig) -> None:
             model_name
         )
 
-    section("DONE")
+    log.info("DONE")
 
 
 if __name__ == "__main__":
