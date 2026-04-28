@@ -1,0 +1,31 @@
+services:
+  detector:
+    build:
+      context: ./ai_text_detector/inference
+      dockerfile: Dockerfile
+    image: ai-text-detector:latest
+    container_name: ai-text-detector
+    ports:
+      - "8000:8000"
+
+    environment:
+      MODEL_DIR: /app/train_results
+      HF_REPO_ID: ${HF_REPO_ID:-}
+      HF_TOKEN:   ${HF_TOKEN:-}
+
+      ENCODER_NAME: ${ENCODER_NAME:-}
+
+      DEVICE: ${DEVICE:-cpu}
+      PORT: 8000
+
+    volumes:
+      - ./train_results:/app/train_results:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
