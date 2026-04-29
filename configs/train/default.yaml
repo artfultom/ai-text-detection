@@ -5,7 +5,7 @@ ae_epochs: 6
 ae_batch_size: 8192
 ae_lr: 1.0e-3
 huggingface:
-  upload: false
+  upload: true
   repo_id: "artfultom/ae-ai-text-detector"
   token: null
   readme_template: "configs/model_readme_template.md"
