@@ -41,28 +41,3 @@ document-level features:
 |--------------|---|
 | Backbone     | `{model}` |
 | Pooling      | `{pooling}` |
-
-## Usage
-
-````python
-import torch
-import numpy as np
-from ai_text_detector import AE
-
-checkpoint = torch.load("model.pt", map_location="cpu")
-meta = checkpoint["metadata"]
-
-model = AE(
-    dim=...,
-    hidden=meta["hidden"],
-    bottleneck=meta["bottleneck"],
-)
-model.load_state_dict(checkpoint["state_dict"])
-model.eval()
-
-# score — reconstruction error, higher = more likely AI-generated
-with torch.no_grad():
-    x = torch.tensor(embeddings, dtype=torch.float32)
-    recon = model(x)
-    scores = torch.mean((x - recon) ** 2, dim=1).numpy()
-````
