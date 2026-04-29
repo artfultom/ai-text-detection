@@ -1,9 +1,12 @@
 output_dir: train_results
 models:
   - all-mpnet-base-v2
-ae_epochs: 6
-ae_batch_size: 8192
-ae_lr: 1.0e-3
+ae_epochs_min: 5
+ae_epochs_max: 50
+lr_min: 1e-4
+lr_max: 1e-2
+batch_sizes: [1024, 2048, 4096, 8192]
+optuna_n_trials: 30
 huggingface:
   upload: true
   repo_id: "artfultom/ae-ai-text-detector"
