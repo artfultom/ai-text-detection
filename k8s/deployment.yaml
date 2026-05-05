@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-text-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-text-detector
+  template:
+    metadata:
+      labels:
+        app: ai-text-detector
+    spec:
+      containers:
+        - name: ai-text-detector
+          image: cr.yandex/crp5jcmge7j28qq05qjj/ai-text-detector:latest
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: MODEL_DIR
+              value: /app/train_results
+            - name: DEVICE
+              value: cpu
+            - name: PORT
+              value: "8080"
+            - name: THRESHOLD
+              value: "0.00065"
